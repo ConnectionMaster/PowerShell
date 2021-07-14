@@ -438,7 +438,7 @@ namespace System.Management.Automation.Host
             {
                 if (TranscriptionData.SystemTranscript == null)
                 {
-                    TranscriptionData.SystemTranscript = PSHostUserInterface.GetSystemTranscriptOption(TranscriptionData.SystemTranscript);
+                    TranscriptionData.SystemTranscript = GetSystemTranscriptOption(TranscriptionData.SystemTranscript);
                     if (TranscriptionData.SystemTranscript != null)
                     {
                         LogTranscriptHeader(null, TranscriptionData.SystemTranscript);
@@ -966,7 +966,7 @@ namespace System.Management.Automation.Host
         private static readonly object s_systemTranscriptLock = new object();
 
         private static readonly Lazy<Transcription> s_transcriptionSettingCache = new Lazy<Transcription>(
-            () => Utils.GetPolicySetting<Transcription>(Utils.SystemWideThenCurrentUserConfig),
+            static () => Utils.GetPolicySetting<Transcription>(Utils.SystemWideThenCurrentUserConfig),
             isThreadSafe: true);
 
         private static TranscriptionOption GetTranscriptOptionFromSettings(Transcription transcriptConfig, TranscriptionOption currentTranscript)
@@ -1262,7 +1262,7 @@ namespace System.Management.Automation.Host
                     Text.StringBuilder splitLabel = new Text.StringBuilder(choices[i].Label.Substring(0, andPos), choices[i].Label.Length);
                     if (andPos + 1 < choices[i].Label.Length)
                     {
-                        splitLabel.Append(choices[i].Label.Substring(andPos + 1));
+                        splitLabel.Append(choices[i].Label.AsSpan(andPos + 1));
                         hotkeysAndPlainLabels[0, i] = CultureInfo.CurrentCulture.TextInfo.ToUpper(choices[i].Label.AsSpan(andPos + 1, 1).Trim().ToString());
                     }
 

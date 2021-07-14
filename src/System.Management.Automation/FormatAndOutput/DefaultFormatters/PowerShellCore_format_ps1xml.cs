@@ -273,6 +273,14 @@ namespace System.Management.Automation.Runspaces
                 ViewsOf_System_Management_Automation_PSStyleFormattingData());
 
             yield return new ExtendedTypeDefinition(
+                "System.Management.Automation.PSStyle+ProgressConfiguration",
+                ViewsOf_System_Management_Automation_PSStyleProgressConfiguration());
+
+            yield return new ExtendedTypeDefinition(
+                "System.Management.Automation.PSStyle+FileInfoFormatting",
+                ViewsOf_System_Management_Automation_PSStyleFileInfoFormat());
+
+            yield return new ExtendedTypeDefinition(
                 "System.Management.Automation.PSStyle+ForegroundColor",
                 ViewsOf_System_Management_Automation_PSStyleForegroundColor());
 
@@ -992,7 +1000,7 @@ namespace System.Management.Automation.Runspaces
                 CustomControl.Create(outOfBand: true)
                     .StartEntry()
                         .AddScriptBlockExpressionBinding(@"
-                                    if (@('NativeCommandErrorMessage','NativeCommandError') -notcontains $_.FullyQualifiedErrorId -and @('CategoryView','ConciseView') -notcontains $ErrorView)
+                                    if (@('NativeCommandErrorMessage','NativeCommandError') -notcontains $_.FullyQualifiedErrorId -and @('CategoryView','ConciseView','DetailedView') -notcontains $ErrorView)
                                     {
                                         $myinv = $_.InvocationInfo
                                         if ($myinv -and $myinv.MyCommand)
@@ -1101,7 +1109,8 @@ namespace System.Management.Automation.Runspaces
                                         $message = ''
                                         $prefix = ''
 
-                                        if ($myinv -and $myinv.ScriptName -or $myinv.ScriptLineNumber -gt 1 -or $err.CategoryInfo.Category -eq 'ParserError') {
+                                        # Don't show line information if script module
+                                        if (($myinv -and $myinv.ScriptName -or $myinv.ScriptLineNumber -gt 1 -or $err.CategoryInfo.Category -eq 'ParserError') -and !($myinv.ScriptName.EndsWith('.psm1', [System.StringComparison]::OrdinalIgnoreCase))) {
                                             $useTargetObject = $false
 
                                             # Handle case where there is a TargetObject and we can show the error at the target rather than the script source
@@ -1281,7 +1290,10 @@ namespace System.Management.Automation.Runspaces
                                     else
                                     {
                                         $myinv = $err.InvocationInfo
-                                        if ($ErrorView -eq 'ConciseView') {
+                                        if ($ErrorView -eq 'DetailedView') {
+                                            return (Get-Error | Out-String)
+                                        }
+                                        elseif ($ErrorView -eq 'ConciseView') {
                                             $posmsg = Get-ConciseViewPositionMessage
                                         }
                                         elseif ($myinv -and ($myinv.MyCommand -or ($err.CategoryInfo.Category -ne 'ParserError'))) {
@@ -1683,8 +1695,8 @@ namespace System.Management.Automation.Runspaces
         }
 
         private const string PreReleaseStringScriptBlock = @"
-                            if ($_.PrivateData -and 
-                                $_.PrivateData.ContainsKey('PSData') -and 
+                            if ($_.PrivateData -and
+                                $_.PrivateData.ContainsKey('PSData') -and
                                 $_.PrivateData.PSData.ContainsKey('PreRelease'))
                             {
                                     $_.PrivateData.PSData.PreRelease
@@ -2048,6 +2060,14 @@ namespace System.Management.Automation.Runspaces
                         .AddItemScriptBlock(@"""$($_.Formatting.Warning)$($_.Formatting.Warning.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Formatting.Warning")
                         .AddItemScriptBlock(@"""$($_.Formatting.Verbose)$($_.Formatting.Verbose.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Formatting.Verbose")
                         .AddItemScriptBlock(@"""$($_.Formatting.Debug)$($_.Formatting.Debug.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Formatting.Debug")
+                        .AddItemScriptBlock(@"""$($_.Progress.Style)$($_.Progress.Style.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Progress.Style")
+                        .AddItemScriptBlock(@"""$($_.Progress.MaxWidth)""", label: "Progress.MaxWidth")
+                        .AddItemScriptBlock(@"""$($_.Progress.View)""", label: "Progress.View")
+                        .AddItemScriptBlock(@"""$($_.Progress.UseOSCIndicator)""", label: "Progress.UseOSCIndicator")
+                        .AddItemScriptBlock(@"""$($_.FileInfo.Directory)$($_.FileInfo.Directory.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "FileInfo.Directory")
+                        .AddItemScriptBlock(@"""$($_.FileInfo.SymbolicLink)$($_.FileInfo.SymbolicLink.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "FileInfo.SymbolicLink")
+                        .AddItemScriptBlock(@"""$($_.FileInfo.Executable)$($_.FileInfo.Executable.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "FileInfo.Executable")
+                        .AddItemScriptBlock(@"""$([string]::Join(',',$_.FileInfo.Extension.Keys))""", label: "FileInfo.Extension")
                         .AddItemScriptBlock(@"""$($_.Foreground.Black)$($_.Foreground.Black.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Foreground.Black")
                         .AddItemScriptBlock(@"""$($_.Foreground.White)$($_.Foreground.White.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Foreground.White")
                         .AddItemScriptBlock(@"""$($_.Foreground.DarkGray)$($_.Foreground.DarkGray.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Foreground.DarkGray")
@@ -2095,6 +2115,52 @@ namespace System.Management.Automation.Runspaces
                         .AddItemScriptBlock(@"""$($_.Warning)$($_.Warning.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Warning")
                         .AddItemScriptBlock(@"""$($_.Verbose)$($_.Verbose.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Formatting.Verbose")
                         .AddItemScriptBlock(@"""$($_.Debug)$($_.Debug.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Debug")
+                    .EndEntry()
+                .EndList());
+        }
+
+        private static IEnumerable<FormatViewDefinition> ViewsOf_System_Management_Automation_PSStyleProgressConfiguration()
+        {
+            yield return new FormatViewDefinition("System.Management.Automation.PSStyle+ProgressConfiguration",
+                ListControl.Create()
+                    .StartEntry()
+                        .AddItemScriptBlock(@"""$($_.Style)$($_.Style.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Style")
+                        .AddItemProperty(@"MaxWidth")
+                        .AddItemProperty(@"View")
+                        .AddItemProperty(@"UseOSCIndicator")
+                    .EndEntry()
+                .EndList());
+        }
+
+        private static IEnumerable<FormatViewDefinition> ViewsOf_System_Management_Automation_PSStyleFileInfoFormat()
+        {
+            yield return new FormatViewDefinition("System.Management.Automation.PSStyle+FileInfoFormatting",
+                ListControl.Create()
+                    .StartEntry()
+                        .AddItemScriptBlock(@"""$($_.Directory)$($_.Directory.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Directory")
+                        .AddItemScriptBlock(@"""$($_.SymbolicLink)$($_.SymbolicLink.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "SymbolicLink")
+                        .AddItemScriptBlock(@"""$($_.Executable)$($_.Executable.Replace(""""`e"""",'`e'))$($PSStyle.Reset)""", label: "Executable")
+                        .AddItemScriptBlock(@"
+                            $sb = [System.Text.StringBuilder]::new()
+                            $maxKeyLength = 0
+                            foreach ($key in $_.Extension.Keys) {
+                                if ($key.Length -gt $maxKeyLength) {
+                                    $maxKeyLength = $key.Length
+                                }
+                            }
+
+                            foreach ($key in $_.Extension.Keys) {
+                                $null = $sb.Append($key.PadRight($maxKeyLength))
+                                $null = $sb.Append(' = ""')
+                                $null = $sb.Append($_.Extension[$key])
+                                $null = $sb.Append($_.Extension[$key].Replace(""`e"",'`e'))
+                                $null = $sb.Append($PSStyle.Reset)
+                                $null = $sb.Append('""')
+                                $null = $sb.Append([Environment]::NewLine)
+                            }
+
+                            $sb.ToString()",
+                            label: "Extension")
                     .EndEntry()
                 .EndList());
         }
